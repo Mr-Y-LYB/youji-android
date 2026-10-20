@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0e19">
+  <title>游迹 · 我的游戏档案</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand-mark">Y<span>J</span></div>
+      <div class="brand-copy"><strong>游迹</strong></div>
+      <button class="icon-btn" id="header-add" aria-label="新增游戏">＋</button>
+    </header>
+
+    <main id="screen" class="screen"></main>
+
+    <nav class="bottom-nav" aria-label="主导航">
+      <button data-tab="home" class="nav-item active"><span class="nav-icon">◈</span><span>概览</span></button>
+      <button data-tab="library" class="nav-item"><span class="nav-icon">▤</span><span>游戏库</span></button>
+      <button data-tab="add" class="nav-item nav-add"><span class="nav-icon">＋</span><span>添加</span></button>
+      <button data-tab="import" class="nav-item"><span class="nav-icon">⇪</span><span>导入</span></button>
+      <button data-tab="settings" class="nav-item"><span class="nav-icon">⚙</span><span>设置</span></button>
+    </nav>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="confirm-layer" class="confirm-layer hidden"></div>
+  <script src="catalog.js"></script>
+  <script src="windows-bridge.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

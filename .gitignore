@@ -1,0 +1,12 @@
+.gradle/
+.toolchain/
+local.properties
+app/build/
+build/
+*.apk
+dist/
+__pycache__/
+*.pyc
+windows/YouJi.spec
+github-publish/
+
