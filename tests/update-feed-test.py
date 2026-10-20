@@ -5,18 +5,18 @@ from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
 feed = json.loads((root / "update.json").read_text(encoding="utf-8"))
-assert feed["tag_name"] == "v1.3.2"
+assert feed["tag_name"] == "v1.3.3"
 assets = {item["name"]: item for item in feed["assets"]}
 for name, local in (
-    ("YouJi-v1.3.2.apk", "游迹-v1.3.2.apk"),
-    ("YouJi-Windows-v1.3.2.zip", "YouJi-Windows-v1.3.2.zip"),
-    ("YouJi-Windows-v1.3.2.exe", "YouJi-Windows-v1.3.2.exe"),
+    ("YouJi-v1.3.3.apk", "游迹-v1.3.3.apk"),
+    ("YouJi-Windows-v1.3.3.zip", "YouJi-Windows-v1.3.3.zip"),
+    ("YouJi-Windows-v1.3.3.exe", "YouJi-Windows-v1.3.3.exe"),
 ):
     path = root / "dist" / local
     item = assets[name]
     assert item["size"] == path.stat().st_size
     assert item["digest"] == "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
     assert item["browser_download_url"] == (
-        "https://github.com/Mr-Y-LYB/youji-android/releases/download/v1.3.2/" + name
+        "https://github.com/Mr-Y-LYB/youji-android/releases/download/v1.3.3/" + name
     )
 print("Update feed matches the built packages")

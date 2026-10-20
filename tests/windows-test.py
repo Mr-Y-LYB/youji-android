@@ -17,6 +17,7 @@ with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parents[1] / "buil
     app.STATE = app.DATA_DIR / "games.json"
     app.SETTINGS = app.DATA_DIR / "settings.json"
     app.COVERS = app.DATA_DIR / "covers"
+    app.ACHIEVEMENT_ICONS = app.DATA_DIR / "achievement-icons"
     app.prepare()
     server = ThreadingHTTPServer(("127.0.0.1", 0), app.Handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -47,7 +48,12 @@ with tempfile.TemporaryDirectory(dir=Path(__file__).resolve().parents[1] / "buil
         assert Image.open(io.BytesIO(cover)).size == (400, 210)
         assert api("cover-clear", {"id": "g1", "kind": "all"})["ok"]
         assert not (app.COVERS / "manual-g1.jpg").exists()
-        print("Windows local storage, asset server and cover checks passed")
+        icon = app.achievement_icon_file("g1", "Achievement1")
+        Image.new("RGB", (80, 80), "#ff3030").save(icon, "JPEG")
+        icon_body = urllib.request.urlopen(base + "/youji-achievements/icon.jpg?game=g1&key=Achievement1").read()
+        assert Image.open(io.BytesIO(icon_body)).size == (80, 80)
+        assert api("achievement-icons", {"game": {"id": "g1", "items": []}})["ok"]
+        print("Windows local storage, cover and achievement icon checks passed")
     finally:
         server.shutdown()
         server.server_close()

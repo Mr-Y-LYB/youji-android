@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import io
 import json
 import mimetypes
@@ -25,26 +26,30 @@ from xml.etree import ElementTree as ET
 from PIL import Image, ImageOps
 
 
-VERSION = "1.3.2"
+VERSION = "1.3.3"
 DATA_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "YouJi"
 ASSETS = ((Path(sys._MEIPASS) / "assets") if hasattr(sys, "_MEIPASS")
           else Path(__file__).resolve().parents[1] / "app/src/main/assets")
 STATE = DATA_DIR / "games.json"
 SETTINGS = DATA_DIR / "settings.json"
 COVERS = DATA_DIR / "covers"
+ACHIEVEMENT_ICONS = DATA_DIR / "achievement-icons"
 TOKEN = secrets.token_urlsafe(32)
 EMPTY_STATE = '{"version":1,"games":[]}'
 ID_PATTERN = re.compile(r"[A-Za-z0-9_-]{1,80}\Z")
 executor = ThreadPoolExecutor(max_workers=2)
+icon_executor = ThreadPoolExecutor(max_workers=4)
 lock = threading.Lock()
 inflight: set[str] = set()
 misses: dict[str, float] = {}
 events: list[dict] = []
+icon_inflight: set[str] = set()
 
 
 def prepare() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     COVERS.mkdir(parents=True, exist_ok=True)
+    ACHIEVEMENT_ICONS.mkdir(parents=True, exist_ok=True)
 
 
 def read_json(path: Path, default):
@@ -95,6 +100,42 @@ def steam_search(query: str, lang: str = "schinese") -> list[dict]:
     return steam_json(url).get("items", [])[:20]
 
 
+def steam_achievement_schema(steam_id: int, language: str) -> dict:
+    url = f"https://steamcommunity.com/achievements/{steam_id}?l={language}"
+    request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; YouJi/1.3.3)",
+                                                  "Accept": "text/html",
+                                                  "Cookie": f"Steam_Language={language}",
+                                                  "Accept-Language": "zh-CN,zh;q=0.9" if language == "schinese" else "en-US,en;q=0.9"})
+    with urllib.request.urlopen(request, timeout=12) as response:
+        if response.status != 200:
+            raise ValueError("Steam 成就页面暂不可用")
+        raw = response.read(2 * 1024 * 1024 + 1)
+    if len(raw) > 2 * 1024 * 1024:
+        raise ValueError("成就清单过大")
+    html = raw.decode("utf-8")
+    match = re.search(r'<script[^>]*id="valve-ssr-data"[^>]*>(.*?)</script>', html, re.S)
+    if not match:
+        raise ValueError("Steam 成就页面格式已变化")
+    page = json.loads(match.group(1))
+    cache = json.loads(page["renderContext"]["queryData"])
+    schema = next((query.get("state", {}).get("data") for query in cache["queries"]
+                   if query.get("queryKey", [])[:3] == ["achievements", steam_id, "schema"]), None)
+    if schema is None:
+        raise ValueError("Steam 未提供成就清单")
+    return schema
+
+
+def public_achievements(schema: dict) -> list[dict]:
+    return [achievement for group in schema.get("groups", [])
+            if not group.get("archived") and group.get("ispublic", True)
+            for achievement in group.get("achievements", [])
+            if not achievement.get("archived") and achievement.get("name")]
+
+
+def achievement_key(item: dict) -> str:
+    return str(item.get("api_name") or item.get("internal_key") or "")
+
+
 def steam_achievement_catalog(game: dict) -> dict:
     if str(game.get("platform", "")).lower() != "steam":
         raise ValueError("该平台暂无公开成就清单，请手动添加")
@@ -114,34 +155,24 @@ def steam_achievement_catalog(game: dict) -> dict:
                 continue
     if steam_id <= 0:
         raise ValueError("未找到对应的 Steam 游戏，请编辑名称后重试")
-    url = f"https://steamcommunity.com/stats/{steam_id}/achievements/?l=schinese"
-    request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; YouJi/1.3.2)",
-                                                  "Accept": "text/html"})
-    with urllib.request.urlopen(request, timeout=12) as response:
-        if response.status != 200:
-            raise ValueError("Steam 成就页面暂不可用")
-        html = response.read(2 * 1024 * 1024 + 1).decode("utf-8")
-    if len(html) > 2 * 1024 * 1024:
-        raise ValueError("成就清单过大")
-    match = re.search(r'<script[^>]*id="valve-ssr-data"[^>]*>(.*?)</script>', html, re.S)
-    if not match:
-        raise ValueError("Steam 成就页面格式已变化")
-    page = json.loads(match.group(1))
-    cache = json.loads(page["renderContext"]["queryData"])
-    schema = next((query.get("state", {}).get("data") for query in cache["queries"]
-                   if query.get("queryKey", [])[:3] == ["achievements", steam_id, "schema"]), None)
-    if schema is None:
-        raise ValueError("Steam 未提供成就清单")
+    english = public_achievements(steam_achievement_schema(steam_id, "english"))
+    try:
+        chinese_schema = steam_achievement_schema(steam_id, "schinese")
+        chinese = {achievement_key(item): item for item in public_achievements(chinese_schema)} \
+            if chinese_schema.get("language") == "schinese" else {}
+    except Exception:
+        chinese = {}
     items = []
-    for group in schema.get("groups", []):
-        if group.get("archived") or not group.get("ispublic", True):
+    for achievement in english:
+        key = achievement_key(achievement)
+        if not key:
             continue
-        for achievement in group.get("achievements", []):
-            if achievement.get("archived") or not achievement.get("name"):
-                continue
-            items.append({"key": achievement.get("api_name") or str(achievement.get("internal_key", "")),
-                          "name": achievement["name"],
-                          "description": achievement.get("description", "")})
+        localized = chinese.get(key, {})
+        items.append({"key": key, "nameEn": achievement["name"],
+                      "descriptionEn": achievement.get("description", ""),
+                      "nameZh": localized.get("name", ""),
+                      "descriptionZh": localized.get("description", ""),
+                      "iconUrl": achievement.get("icon_achieved", "")})
     return {"steamId": steam_id, "items": items}
 
 
@@ -173,6 +204,54 @@ def trusted_image(url: str) -> bool:
     parts = urllib.parse.urlsplit(url)
     host = (parts.hostname or "").lower()
     return parts.scheme == "https" and (host == "steamstatic.com" or host.endswith(".steamstatic.com"))
+
+
+def achievement_icon_file(game_id: str, key: str) -> Path:
+    digest = hashlib.sha256((game_id + "\n" + key).encode("utf-8")).hexdigest()
+    return ACHIEVEMENT_ICONS / f"{digest}.jpg"
+
+
+def fetch_achievement_icon(game_id: str, key: str, url: str) -> None:
+    token = game_id + "\n" + key
+    try:
+        request = urllib.request.Request(url, headers={"User-Agent": "YouJi/1.3.3 Windows"})
+        with urllib.request.urlopen(request, timeout=12) as response:
+            if not trusted_image(response.url) or not response.headers.get_content_type().startswith("image/"):
+                return
+            raw = response.read(256 * 1024 + 1)
+        if len(raw) > 256 * 1024:
+            return
+        with Image.open(io.BytesIO(raw)) as source:
+            if source.width > 4096 or source.height > 4096:
+                return
+            output = io.BytesIO()
+            ImageOps.fit(source.convert("RGB"), (80, 80), method=Image.Resampling.LANCZOS).save(output, "JPEG", quality=85)
+        write_atomic(achievement_icon_file(game_id, key), output.getvalue())
+        with lock:
+            events.append({"kind": "achievement-icon", "id": game_id, "key": key})
+    except Exception:
+        pass
+    finally:
+        with lock:
+            icon_inflight.discard(token)
+
+
+def queue_achievement_icons(game: dict) -> None:
+    game_id = str(game.get("id", ""))
+    if not ID_PATTERN.fullmatch(game_id):
+        return
+    for item in game.get("items", [])[:1000]:
+        if not isinstance(item, dict):
+            continue
+        key, url = str(item.get("key", "")), str(item.get("iconUrl", ""))
+        token = game_id + "\n" + key
+        if not key or len(key) > 200 or not trusted_image(url) or achievement_icon_file(game_id, key).is_file():
+            continue
+        with lock:
+            if token in icon_inflight:
+                continue
+            icon_inflight.add(token)
+        icon_executor.submit(fetch_achievement_icon, game_id, key, url)
 
 
 def fetch_cover(game: dict) -> None:
@@ -321,6 +400,16 @@ class Handler(BaseHTTPRequestHandler):
                     return
             self.send_bytes(b"", "text/plain", 404)
             return
+        if path == "/youji-achievements/icon.jpg":
+            query = urllib.parse.parse_qs(parsed.query)
+            game_id, key = query.get("game", [""])[0], query.get("key", [""])[0]
+            if ID_PATTERN.fullmatch(game_id) and key and len(key) <= 200:
+                target = achievement_icon_file(game_id, key)
+                if target.is_file():
+                    self.send_bytes(target.read_bytes(), "image/jpeg")
+                    return
+            self.send_bytes(b"", "text/plain", 404)
+            return
         filename = "index.html" if path == "/" else path.lstrip("/")
         if filename not in {"index.html", "app.js", "catalog.js", "style.css", "windows-bridge.js"}:
             self.send_bytes(b"", "text/plain", 404)
@@ -367,6 +456,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"ok": True})
             elif path == "/api/covers":
                 queue_covers(request.get("games", []))
+                self.send_json({"ok": True})
+            elif path == "/api/achievement-icons":
+                queue_achievement_icons(request.get("game", {}))
                 self.send_json({"ok": True})
             elif path == "/api/cover-clear":
                 game_id = str(request.get("id", ""))

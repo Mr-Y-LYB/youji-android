@@ -46,15 +46,19 @@ public class MainActivity extends Activity {
     private static final int PICK_EXPORT = 102;
     private static final int PICK_SCREENSHOT = 103;
     private static final int PICK_COVER = 104;
+    private static final int PICK_ACHIEVEMENT_ICON = 105;
     private static final int MAX_IMPORT_BYTES = 10 * 1024 * 1024;
     private static final int MAX_BACKUP_BYTES = 30 * 1024 * 1024;
     private WebView web;
     private String pendingExport;
     private String pendingCoverId;
+    private String pendingAchievementGameId;
+    private String pendingAchievementKey;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final ExecutorService achievementWorker = Executors.newFixedThreadPool(2);
     private UpdateManager updater;
     private CoverManager covers;
+    private AchievementIconManager icons;
     private boolean pageReady;
 
     @Override public void onCreate(Bundle state) {
@@ -63,6 +67,7 @@ public class MainActivity extends Activity {
         getWindow().setNavigationBarColor(Color.rgb(10, 14, 25));
         updater = new UpdateManager(this, worker, this::callback);
         covers = new CoverManager(this, this::callback);
+        icons = new AchievementIconManager(this, this::callback);
         web = new WebView(this);
         web.getSettings().setJavaScriptEnabled(true);
         web.getSettings().setDomStorageEnabled(true);
@@ -76,7 +81,8 @@ public class MainActivity extends Activity {
                 return !"file".equals(request.getUrl().getScheme());
             }
             @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
-                return covers.response(request.getUrl());
+                WebResourceResponse cover = covers.response(request.getUrl());
+                return cover != null ? cover : icons.response(request.getUrl());
             }
             @Override public void onPageFinished(WebView view, String url) {
                 pageReady = true;
@@ -104,6 +110,21 @@ public class MainActivity extends Activity {
     public class Bridge {
         @JavascriptInterface public void ensureCovers(String gamesJson) {
             covers.ensure(gamesJson);
+        }
+
+        @JavascriptInterface public void ensureAchievementIcons(String gameJson) {
+            icons.ensure(gameJson);
+        }
+
+        @JavascriptInterface public void pickAchievementIcon(String gameId, String key) {
+            runOnUiThread(() -> {
+                pendingAchievementGameId = gameId;
+                pendingAchievementKey = key;
+                Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                intent.setType("image/*");
+                startActivityForResult(intent, PICK_ACHIEVEMENT_ICON);
+            });
         }
 
         @JavascriptInterface public void pickCover(String gameId) {
@@ -295,10 +316,28 @@ public class MainActivity extends Activity {
         super.onActivityResult(request, result, data);
         String coverId = request == PICK_COVER ? pendingCoverId : null;
         if (request == PICK_COVER) pendingCoverId = null;
+        String iconGameId = request == PICK_ACHIEVEMENT_ICON ? pendingAchievementGameId : null;
+        String iconKey = request == PICK_ACHIEVEMENT_ICON ? pendingAchievementKey : null;
+        if (request == PICK_ACHIEVEMENT_ICON) {
+            pendingAchievementGameId = null;
+            pendingAchievementKey = null;
+        }
         if (result != RESULT_OK || data == null || data.getData() == null) return;
         Uri uri = data.getData();
         if (request == PICK_COVER) {
             covers.importManual(coverId, uri);
+        } else if (request == PICK_ACHIEVEMENT_ICON) {
+            worker.execute(() -> {
+                try (InputStream input = getContentResolver().openInputStream(uri)) {
+                    if (input == null) throw new IllegalStateException("无法读取图片");
+                    byte[] encoded = AchievementIconManager.squareJpeg(readLimited(input, 12 * 1024 * 1024));
+                    JSONObject event = new JSONObject();
+                    event.put("id", iconGameId);
+                    event.put("key", iconKey);
+                    event.put("data", "data:image/jpeg;base64," + android.util.Base64.encodeToString(encoded, android.util.Base64.NO_WRAP));
+                    callback("onManualAchievementIconReady", event.toString());
+                } catch (Exception e) { callback("onAchievementIconError", JSONObject.quote("图标读取失败")); }
+            });
         } else if (request == PICK_EXPORT) {
             String content = pendingExport;
             pendingExport = null;

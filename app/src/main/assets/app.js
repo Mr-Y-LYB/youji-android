@@ -7,6 +7,8 @@ const native = typeof Native !== 'undefined' ? Native : {
   checkForUpdates: () => {},
   downloadUpdate: () => {},
   ensureCovers: () => {},
+  ensureAchievementIcons: () => {},
+  pickAchievementIcon: () => toast('浏览器预览不支持选图'),
   pickCover: () => toast('浏览器预览不支持选图'),
   getManualCoverData: () => '',
   saveManualCover: () => false,
@@ -23,8 +25,9 @@ const native = typeof Native !== 'undefined' ? Native : {
 let data;
 try { data=JSON.parse(native.loadState()); if (!Array.isArray(data.games)) throw Error('bad state'); }
 catch(e) { data={version:1,games:[]}; }
-const APP_VERSION='1.3.2';
+const APP_VERSION='1.3.3';
 const CHANGELOG=[
+  {version:'1.3.3',date:'2026-10-20',changes:['Steam 成就显示平台图标，可在设置中切换中文或英文。','自建成就可选择图片；升级后保留已勾选状态。']},
   {version:'1.3.2',date:'2026-10-20',changes:['Steam 游戏可读取该平台的完整成就清单，并在详情中逐项标记完成。','其他平台可手动添加成就；旧版成就数字保留为历史统计。','添加和导入页面移除手填成就数字。']},
   {version:'1.3.1',date:'2026-10-20',changes:['更新检查失败时会重试并使用备用版本信息。','手动检查更新会显示实际连接结果。']},
   {version:'1.3.0',date:'2026-10-20',changes:['游戏列表自动显示匹配到的 Steam 官方预览图，图片下载后保存在手机本地。','可为未匹配到的游戏手动选取封面。','统一设置页图标尺寸。']},
@@ -36,8 +39,13 @@ function seenVersion(){try{return native.getSeenVersion()||'';}catch(e){return '
 function markVersionSeen(){try{native.markVersionSeen(APP_VERSION);}catch(e){}}
 let tab=seenVersion()===APP_VERSION?'home':'updates', updatesReturn='home', editId=null, detailId=null, detailReturn='library', importMode='screenshot', importCandidates=[], importPage=0, duplicateMode='merge', importTable=null, mapping={}, importSource='', onlineResults=[], onlineStatus='', onlineSeq=0, onlineTimer=null, selectedSearchSeq=0, selectedSteamId=0, libQuery='', libFilter='all', libSort='recent', availableUpdate=null;
 const achievementLoading=new Set(), achievementErrors={}, achievementPending=[];
-let achievementActive=0;
+let achievementActive=0, pendingImportLanguage=null;
 const coverEpoch={};
+const iconEpoch={};
+function achievementLanguage(){return data.achievementLanguage==='en'?'en':'zh';}
+function achievementText(item,field){const suffix=achievementLanguage()==='zh'?'Zh':'En';return item.manual?String(item[field]||''):String(item[field+suffix]||item[field+'En']||item[field]||'');}
+function achievementIconUrl(game,item){if(item.manualIconData)return item.manualIconData;if(!item.iconUrl)return '';const base=window.__YOUJI_WINDOWS__?'':'https://appassets.androidplatform.net';return base+'/youji-achievements/icon.jpg?game='+encodeURIComponent(game.id)+'&key='+encodeURIComponent(item.key)+'&v='+(iconEpoch[game.id+'\n'+item.key]||1);}
+function ensureAchievementIcons(game){if(!game||game.platform!=='Steam')return;const items=(game.achievementItems||[]).filter(x=>!x.manual&&x.iconUrl).map(x=>({key:x.key,iconUrl:x.iconUrl}));if(items.length)native.ensureAchievementIcons(JSON.stringify({id:game.id,items}));}
 const platforms=['Steam','Epic','Xbox / PC Game Pass','GOG','Ubisoft Connect','EA app','Battle.net','WeGame','其他'];
 const statuses=['想玩','在玩','已通关','已搁置','弃坑'];
 function norm(s){return String(s||'').toLowerCase().replace(/[\s\-_:：·•.。,，！!？?()（）'"’]/g,'');}
@@ -111,11 +119,11 @@ function renderDetail(){
     ${history?`<p class="history-count">旧版统计：${safeInt(g.achievements)} / ${safeInt(g.totalAchievements)}（未对应具体条目）</p>`:''}
     ${g.platform==='Steam'?`<div class="achievement-tools"><button class="btn btn-outline" data-action="refresh-achievements" data-id="${esc(g.id)}" ${loading?'disabled':''}>${loading?'正在读取 Steam 成就…':'刷新 Steam 成就'}</button></div>`:''}
     ${achievementErrors[g.id]?`<p class="achievement-error">${esc(achievementErrors[g.id])}</p>`:''}
-    ${items.length?`<div class="achievement-list">${items.map((item,i)=>`<div class="achievement-row"><label><input type="checkbox" data-achievement-index="${i}" ${item.unlocked?'checked':''}><span><strong>${esc(item.name)}${item.manual&&official.length?' · 自建':''}</strong>${item.description?`<small>${esc(item.description)}</small>`:''}</span></label>${item.manual?`<button data-action="remove-achievement" data-index="${i}" aria-label="删除${esc(item.name)}">×</button>`:''}</div>`).join('')}</div>`:!loading?`<div class="empty compact-empty">${g.platform==='Steam'&&g.achievementSynced?'该游戏在 Steam 没有公开成就':'暂无成就条目'}</div>`:''}
+    ${items.length?`<div class="achievement-list">${items.map((item,i)=>`<div class="achievement-row ${item.unlocked?'unlocked':''}"><span class="achievement-icon">${achievementIconUrl(g,item)?`<img data-achievement-game="${esc(g.id)}" data-achievement-key="${esc(item.key)}" src="${esc(achievementIconUrl(g,item))}" alt="">`:''}<span class="achievement-icon-fallback">${esc((g.platform||'?').slice(0,1))}</span></span><label><input type="checkbox" data-achievement-index="${i}" ${item.unlocked?'checked':''}><span><strong>${esc(achievementText(item,'name'))}${item.manual&&official.length?' · 自建':''}</strong>${achievementText(item,'description')?`<small>${esc(achievementText(item,'description'))}</small>`:''}</span></label>${item.manual?`<span class="achievement-actions"><button data-action="pick-achievement-icon" data-index="${i}" aria-label="选择成就图标">选图</button><button data-action="remove-achievement" data-index="${i}" aria-label="删除${esc(item.name)}">×</button></span>`:''}</div>`).join('')}</div>`:!loading?`<div class="empty compact-empty">${g.platform==='Steam'&&g.achievementSynced?'该游戏在 Steam 没有公开成就':'暂无成就条目'}</div>`:''}
     <details class="optional-fields achievement-add"><summary>手动添加成就</summary><div class="form-panel compact-form"><div class="field"><label for="achievement-name">成就名称</label><input id="achievement-name" maxlength="160" placeholder="成就名称"></div><div class="field"><label for="achievement-description">说明（可选）</label><input id="achievement-description" maxlength="500" placeholder="完成条件"></div><button class="btn btn-primary" data-action="add-achievement">添加</button></div></details>
     ${g.notes?`<div class="panel detail-notes"><h2>备注</h2><p>${esc(g.notes)}</p></div>`:''}`;
 }
-function openDetail(id){const game=data.games.find(g=>g.id===id);if(!game)return;detailReturn=tab==='home'?'home':'library';detailId=id;tab='detail';render();window.scrollTo(0,0);if(game.platform==='Steam'&&!game.achievementSynced)requestAchievements(game);}
+function openDetail(id){const game=data.games.find(g=>g.id===id);if(!game)return;detailReturn=tab==='home'?'home':'library';detailId=id;tab='detail';render();window.scrollTo(0,0);ensureAchievementIcons(game);if(game.platform==='Steam'&&(!game.achievementSynced||game.achievementSchemaVersion<2))requestAchievements(game);}
 function pumpAchievements(){
   while(achievementActive<2&&achievementPending.length){
     const game=achievementPending.shift();
@@ -126,7 +134,7 @@ function pumpAchievements(){
   }
 }
 function requestAchievements(game,force=false,background=false){
-  if(!game||game.platform!=='Steam'||!force&&game.achievementSynced)return;
+  if(!game||game.platform!=='Steam'||!force&&game.achievementSynced&&game.achievementSchemaVersion>=2)return;
   if(achievementLoading.has(game.id)){
     if(!background){const i=achievementPending.findIndex(x=>x.id===game.id);if(i>0)achievementPending.unshift(achievementPending.splice(i,1)[0]);}
     return;
@@ -140,13 +148,14 @@ window.onAchievementsLoaded=result=>{
   const id=String(result.id||'');achievementLoading.delete(id);achievementActive=Math.max(0,achievementActive-1);pumpAchievements();
   const game=data.games.find(g=>g.id===id);
   if(!game)return;
-  if(game.platform!==result.platform||game.title!==result.title){if(game.platform==='Steam'&&!game.achievementSynced)requestAchievements(game);return;}
+  if(game.platform!==result.platform||game.title!==result.title){if(game.platform==='Steam'&&(!game.achievementSynced||game.achievementSchemaVersion<2))requestAchievements(game);return;}
   if(result.error){achievementErrors[id]=result.error;}
   else if(Array.isArray(result.items)){
     const old=Array.isArray(game.achievementItems)?game.achievementItems:[];
     const previous=new Map(old.filter(x=>!x.manual).map(x=>[String(x.key),x]));
-    game.achievementItems=result.items.filter(x=>x&&x.key&&x.name).map(x=>({key:String(x.key),name:String(x.name),description:String(x.description||''),unlocked:!!previous.get(String(x.key))?.unlocked})).concat(old.filter(x=>x.manual));
-    game.achievementSynced=true;game.achievementPlatform='Steam';game.steamId=Number(result.steamId)||game.steamId||0;
+    game.achievementItems=result.items.filter(x=>x&&x.key&&(x.nameEn||x.nameZh||x.name)).map(x=>({key:String(x.key),name:String(x.nameEn||x.nameZh||x.name),description:String(x.descriptionEn||x.description||''),nameEn:String(x.nameEn||x.name||''),descriptionEn:String(x.descriptionEn||x.description||''),nameZh:String(x.nameZh||''),descriptionZh:String(x.descriptionZh||''),iconUrl:String(x.iconUrl||''),unlocked:!!previous.get(String(x.key))?.unlocked})).concat(old.filter(x=>x.manual));
+    game.achievementSynced=true;game.achievementSchemaVersion=2;game.achievementPlatform='Steam';game.steamId=Number(result.steamId)||game.steamId||0;
+    ensureAchievementIcons(game);
     delete achievementErrors[id];persist();
   }
   if(tab==='detail'&&detailId===id)render();
@@ -192,6 +201,7 @@ function renderSettings(){
     <button class="setting-action" data-action="restore">${settingIcon('restore')}<span><b>导入 JSON 备份</b></span><span class="arrow">›</span></button>
     <button class="setting-action" data-action="nav" data-to="updates">${settingIcon('updates')}<span><b>更新说明</b></span><span class="arrow">›</span></button>
     <button class="setting-action" data-action="check-update">${settingIcon('check')}<span><b>检查更新</b></span><span class="arrow">›</span></button>
+    <div class="setting-language"><label for="achievement-language">成就语言</label><select id="achievement-language"><option value="zh" ${achievementLanguage()==='zh'?'selected':''}>中文</option><option value="en" ${achievementLanguage()==='en'?'selected':''}>English</option></select></div>
     <div class="settings-meta"><span>${data.games.length} 条记录 · 仅本机</span><span>v${APP_VERSION}</span></div>`;
 }
 function renderUpdates(){
@@ -266,8 +276,9 @@ function normalizeImported(raw){
     recentHours:num(raw.recentHours??raw['近期时长']??0),
     achievements:safeInt(raw.achievements??raw['已解锁成就']??raw['已完成成就']??0),
     totalAchievements:safeInt(raw.totalAchievements??raw['成就总数']??0),
-    achievementItems:Array.isArray(raw.achievementItems)?raw.achievementItems.slice(0,1000).filter(x=>x&&x.key&&x.name).map(x=>({key:String(x.key).slice(0,180),name:String(x.name).slice(0,160),description:String(x.description||'').slice(0,500),unlocked:!!x.unlocked,manual:!!x.manual})):[],
+    achievementItems:Array.isArray(raw.achievementItems)?raw.achievementItems.slice(0,1000).filter(x=>x&&x.key&&(x.name||x.nameEn||x.nameZh)).map(x=>({key:String(x.key).slice(0,180),name:String(x.name||x.nameEn||x.nameZh).slice(0,160),description:String(x.description||x.descriptionEn||'').slice(0,500),nameEn:String(x.nameEn||'').slice(0,160),nameZh:String(x.nameZh||'').slice(0,160),descriptionEn:String(x.descriptionEn||'').slice(0,500),descriptionZh:String(x.descriptionZh||'').slice(0,500),iconUrl:String(x.iconUrl||'').slice(0,500),manualIconData:String(x.manualIconData||'').slice(0,30000),unlocked:!!x.unlocked,manual:!!x.manual})):[],
     achievementSynced:!!raw.achievementSynced,
+    achievementSchemaVersion:safeInt(raw.achievementSchemaVersion||0),
     rating:raw.rating??'',price:raw.price??'',acquiredAt:String(raw.acquiredAt||''),
     lastPlayedAt:String(raw.lastPlayedAt||''),notes:String(raw.notes||raw['备注']||''),
     source:String(raw.source||importSource||'导入'),updatedAt:new Date().toISOString(),
@@ -283,7 +294,7 @@ function renderMapping(){if(!importTable)return '';const fields=[['title','游�
 function applyMapping(){document.querySelectorAll('[data-map]').forEach(el=>mapping[el.dataset.map]=el.value);if(mapping.title===''){toast('请指定游戏名称列');return;}const items=importTable.rows.map(row=>{const raw={source:importTable.source};for(const [key,index] of Object.entries(mapping))if(index!=='')raw[key]=row[Number(index)]||'';return normalizeImported(raw);}).filter(Boolean);startPreview(items,importTable.source);}
 function parseLooseText(text){const lines=String(text||'').split(/\r?\n/).map(s=>s.trim()).filter(Boolean);const items=[];let current=null;for(const line of lines){if(/^(游戏墙|游戏库|总时长|成就|\d{1,2}:\d{2})$/.test(line))continue;const hours=[...line.matchAll(/(\d+(?:[.,]\d+)?)\s*(?:h|小时)/gi)];const ach=line.match(/(\d+)\s*[\/／]\s*(\d+)/);if(hours.length){if(!current)continue;if(current.hours===undefined){current.hours=num(hours[0][1]);if(hours[1])current.recentHours=num(hours[1][1]);}else if(current.recentHours===undefined)current.recentHours=num(hours[0][1]);if(ach){current.achievements=safeInt(ach[1]);current.totalAchievements=safeInt(ach[2]);}continue;}if(ach&&current){current.achievements=safeInt(ach[1]);current.totalAchievements=safeInt(ach[2]);continue;}if(/^[\d.\/／\s-]+$/.test(line))continue;if(current&&current.hours!==undefined)items.push(current);current={title:line};}if(current&&current.hours!==undefined)items.push(current);if(!items.length){for(const line of lines){const parts=line.split(/[,，\t|]/).map(s=>s.trim());if(parts[0]&&parts.length>1&&/[\d.]/.test(parts[1]))items.push({title:parts[0],hours:num(parts[1]),achievements:parts[2]?safeInt(parts[2]):0,totalAchievements:parts[3]?safeInt(parts[3]):0});}}return items;}
 function parseScreenshotLines(lines){const all=(lines||[]).map(x=>({...x,text:String(x.text||'').trim()})).filter(x=>x.text).sort((a,b)=>a.y-b.y||a.x-b.x);const hourLines=all.filter(x=>/^\d+(?:[.,]\d+)?\s*(?:h|小时)$/i.test(x.text));const groups=[];for(const line of hourLines){let g=groups.find(g=>Math.abs(g.y-line.y)<Math.max(15,line.h*.9));if(!g){g={y:line.y,hours:[]};groups.push(g);}g.hours.push(line);}const items=[];for(const group of groups){group.hours.sort((a,b)=>a.x-b.x);const main=group.hours[0];const names=all.filter(x=>x.y<main.y&&main.y-x.y<Math.max(75,main.h*4)&&x.x>=main.x-45&&x.x<main.x+110&&!/^(\d+\s*[\/／]\s*\d+|\d+(?:[.,]\d+)?\s*h)$/i.test(x.text)&&!/游戏墙|13:|Wi-Fi/.test(x.text)).sort((a,b)=>b.y-a.y||a.x-b.x);let title=names[0]?.text||'';if(!title)continue;const achieved=all.filter(x=>Math.abs(x.y-main.y)<Math.max(35,main.h*2)&&x.x>main.x+Math.max(100,main.w*2)).map(x=>x.text).find(t=>/\d+\s*[\/／]\s*\d+/.test(t));const a=achieved?.match(/(\d+)\s*[\/／]\s*(\d+)/);items.push({title,hours:num(main.text),recentHours:group.hours[1]?num(group.hours[1].text):0,achievements:a?safeInt(a[1]):0,totalAchievements:a?safeInt(a[2]):0});}return items;}
-function startPreview(items,source){importCandidates=items.slice(0,10000).map(normalizeImported).filter(Boolean).map(g=>({...g,_selected:true}));importPage=0;duplicateMode='merge';importSource=source;tab='preview';render();window.scrollTo(0,0);if(!importCandidates.length)toast('没有识别到记录，请改用粘贴文字或手动添加');}
+function startPreview(items,source){if(source!=='游迹 JSON 备份')pendingImportLanguage=null;importCandidates=items.slice(0,10000).map(normalizeImported).filter(Boolean).map(g=>({...g,_selected:true}));importPage=0;duplicateMode='merge';importSource=source;tab='preview';render();window.scrollTo(0,0);if(!importCandidates.length)toast('没有识别到记录，请改用粘贴文字或手动添加');}
 function renderPreview(){const pageSize=50,start=importPage*pageSize,sample=importCandidates.slice(start,start+pageSize),pages=Math.max(1,Math.ceil(importCandidates.length/pageSize));return `<h1 class="page-title compact-title">核对导入</h1><p class="count-line">${esc(importSource)} · ${importCandidates.length} 条</p><div class="panel"><h2>遇到已有记录时</h2><div class="field"><select id="duplicate-mode"><option value="merge">更新时长，保留原备注</option><option value="skip">跳过重复记录</option><option value="copy">另存一条记录</option></select></div></div>${pages>1?`<div class="section-head"><h2>第 ${importPage+1} / ${pages} 页</h2><div><button data-action="preview-page" data-page="${importPage-1}" ${importPage===0?'disabled':''}>‹ 上页</button><button data-action="preview-page" data-page="${importPage+1}" ${importPage>=pages-1?'disabled':''}>下页 ›</button></div></div>`:''}<div id="review-list">${sample.map((g,j)=>{const i=start+j;return `<div class="review-row" data-review="${i}"><header><input type="checkbox" ${g._selected!==false?'checked':''} aria-label="导入此游戏"><b>记录 ${i+1}</b><button class="remove" data-action="remove-review" data-index="${i}">移除</button></header><div class="row"><div class="field"><label>游戏名称</label><input data-key="title" value="${esc(g.title)}"></div><div class="field"><label>英文原名</label><input data-key="titleEn" value="${esc(g.titleEn)}"></div></div><div class="row"><div class="field"><label>平台</label><select data-key="platform">${optionList(platforms,g.platform)}</select></div><div class="field"><label>总时长（小时）</label><input data-key="hours" type="number" min="0" step="0.1" value="${num(g.hours)}"></div></div><div class="field"><label>近期时长</label><input data-key="recentHours" type="number" min="0" step="0.1" value="${num(g.recentHours)}"></div></div>`;}).join('')}</div><div class="form-actions"><button class="btn btn-primary" data-action="commit-import">确认导入全部已选记录</button><button class="btn btn-outline" data-action="nav" data-to="import">取消</button></div>`;}
 function captureReview(){document.querySelectorAll('[data-review]').forEach(row=>{const g=importCandidates[Number(row.dataset.review)];if(!g)return;g._selected=row.querySelector('header input').checked;row.querySelectorAll('[data-key]').forEach(input=>g[input.dataset.key]=input.value);g.title=g.title.trim();g.titleEn=g.titleEn.trim();g.hours=num(g.hours);g.recentHours=num(g.recentHours);});}
 function commitImport(){
@@ -305,7 +316,7 @@ function commitImport(){
     else{
       old.hours=item.hours;old.recentHours=item.recentHours;
       if(item.totalAchievements>0){old.achievements=item.achievements;old.totalAchievements=item.totalAchievements;}
-      if(item.achievementItems.length){const existingItems=new Map((old.achievementItems||[]).map(x=>[String(x.key),x]));old.achievementItems=item.achievementItems.map(x=>({...x,unlocked:!!(x.unlocked||existingItems.get(String(x.key))?.unlocked)}));old.achievementSynced=item.achievementSynced;}
+      if(item.achievementItems.length){const existingItems=new Map((old.achievementItems||[]).map(x=>[String(x.key),x]));old.achievementItems=item.achievementItems.map(x=>({...x,unlocked:!!(x.unlocked||existingItems.get(String(x.key))?.unlocked)}));old.achievementSynced=item.achievementSynced;old.achievementSchemaVersion=item.achievementSchemaVersion;}
       old.titleEn=old.titleEn||item.titleEn;old.steamId=old.steamId||item.steamId||0;
       old.source=item.source;old.updatedAt=new Date().toISOString();
       if(item.manualCoverData)coverCopies.push({id:old.id,data:item.manualCoverData,game:old});
@@ -313,6 +324,7 @@ function commitImport(){
       updated++;
     }
   }
+  if(pendingImportLanguage){data.achievementLanguage=pendingImportLanguage;pendingImportLanguage=null;}
   if(!persist()){data.games=JSON.parse(before);toast('保存失败，请检查存储空间');return;}
   for(const cover of coverCopies){
     if(native.saveManualCover(cover.id,cover.data)){
@@ -325,9 +337,9 @@ function commitImport(){
   toast(`已导入 ${added} 条，更新 ${updated} 条${skipped?`，跳过 ${skipped} 条`:''}`);
   navigate('library');
   ensureCovers(data.games);
-  addedGames.filter(g=>g.platform==='Steam'&&!g.achievementSynced).forEach(g=>requestAchievements(g,false,true));
+  addedGames.filter(g=>g.platform==='Steam'&&(!g.achievementSynced||g.achievementSchemaVersion<2)).forEach(g=>requestAchievements(g,false,true));
 }
-window.onPickedFile=result=>{if(result.error){toast(result.error);return;}const name=result.name||'文件';if(Array.isArray(result.rows)){startTable(result.rows,name);return;}const text=String(result.text||'').trim();if(!text){toast('文件为空');return;}try{const json=JSON.parse(text);const arr=Array.isArray(json)?json:Array.isArray(json.games)?json.games:Array.isArray(json.data)?json.data:null;if(arr){importSource=json.format==='youji-backup'?'游迹 JSON 备份':name;startPreview(arr,importSource);return;}}catch(e){}if(/^\s*</.test(text)){const doc=new DOMParser().parseFromString(text,'text/html');const tables=[...doc.querySelectorAll('table')];if(tables.length){const rows=[...tables[0].querySelectorAll('tr')].map(tr=>[...tr.querySelectorAll('th,td')].map(x=>x.textContent.trim()));startTable(rows,name);return;}startPreview(parseLooseText(doc.body.textContent),name);return;}const first=text.split(/\r?\n/,1)[0];if(first.includes('\t')||first.includes(',')||first.includes('，')){const delimiter=first.includes('\t')?'\t':first.includes(',')?',':'，';const rows=parseDelimited(text,delimiter);if(rows.length>1&&rows[0].length>1){startTable(rows,name);return;}}startPreview(parseLooseText(text),name);};
+window.onPickedFile=result=>{if(result.error){toast(result.error);return;}const name=result.name||'文件';if(Array.isArray(result.rows)){startTable(result.rows,name);return;}const text=String(result.text||'').trim();if(!text){toast('文件为空');return;}try{const json=JSON.parse(text);const arr=Array.isArray(json)?json:Array.isArray(json.games)?json.games:Array.isArray(json.data)?json.data:null;if(arr){pendingImportLanguage=json.format==='youji-backup'&&['en','zh'].includes(json.achievementLanguage)?json.achievementLanguage:null;importSource=json.format==='youji-backup'?'游迹 JSON 备份':name;startPreview(arr,importSource);return;}}catch(e){}if(/^\s*</.test(text)){const doc=new DOMParser().parseFromString(text,'text/html');const tables=[...doc.querySelectorAll('table')];if(tables.length){const rows=[...tables[0].querySelectorAll('tr')].map(tr=>[...tr.querySelectorAll('th,td')].map(x=>x.textContent.trim()));startTable(rows,name);return;}startPreview(parseLooseText(doc.body.textContent),name);return;}const first=text.split(/\r?\n/,1)[0];if(first.includes('\t')||first.includes(',')||first.includes('，')){const delimiter=first.includes('\t')?'\t':first.includes(',')?',':'，';const rows=parseDelimited(text,delimiter);if(rows.length>1&&rows[0].length>1){startTable(rows,name);return;}}startPreview(parseLooseText(text),name);};
 window.onScreenshotText=lines=>{const parsed=parseScreenshotLines(lines);startPreview(parsed,'小黑盒截图');if(!parsed.length)toast('未识别出完整游戏行，可尝试裁剪图片或改用文字导入');};
 window.onScreenshotError=message=>toast(message);
 window.onExportFinished=ok=>toast(ok?'备份已保存':'导出失败，请重试');
@@ -352,6 +364,21 @@ window.onManualCoverReady=result=>{
   refreshCover(result.id);toast('封面已保存');
 };
 window.onCoverError=message=>toast(message);
+window.onAchievementIconReady=result=>{
+  const token=result.id+'\n'+result.key;iconEpoch[token]=Date.now();
+  document.querySelectorAll('[data-achievement-game][data-achievement-key]').forEach(img=>{
+    if(img.dataset.achievementGame===result.id&&img.dataset.achievementKey===result.key){
+      const game=data.games.find(g=>g.id===result.id),item=game?.achievementItems?.find(x=>x.key===result.key);
+      if(item){img.hidden=false;img.src=achievementIconUrl(game,item);}
+    }
+  });
+};
+window.onManualAchievementIconReady=result=>{
+  const game=data.games.find(g=>g.id===result.id),item=game?.achievementItems?.find(x=>x.key===result.key&&x.manual);
+  if(!item)return;item.manualIconData=String(result.data||'').slice(0,30000);
+  if(persist()){if(tab==='detail'&&detailId===game.id)render();toast('图标已保存');}else toast('保存失败');
+};
+window.onAchievementIconError=message=>toast(message);
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-action]');if(!b)return;
   switch(b.dataset.action){
@@ -359,6 +386,10 @@ document.addEventListener('click',e=>{
     case 'view-game':openDetail(b.dataset.id);break;
     case 'edit':editId=b.dataset.id;selectedSteamId=0;tab='add';render();window.scrollTo(0,0);break;
     case 'refresh-achievements':requestAchievements(data.games.find(g=>g.id===b.dataset.id),true);break;
+    case 'pick-achievement-icon':{
+      const game=data.games.find(g=>g.id===detailId),item=game?.achievementItems?.[Number(b.dataset.index)];
+      if(item?.manual)native.pickAchievementIcon(game.id,item.key);break;
+    }
     case 'add-achievement':{
       const g=data.games.find(x=>x.id===detailId),name=$('achievement-name')?.value.trim(),description=$('achievement-description')?.value.trim()||'';
       if(!g||!name){toast('请填写成就名称');break;}
@@ -401,7 +432,7 @@ document.addEventListener('click',e=>{
       break;
     }
     case 'commit-import':commitImport();break;
-    case 'export':native.exportBackup(JSON.stringify({format:'youji-backup',version:1,exportedAt:new Date().toISOString(),games:backupGames()},null,2));break;
+    case 'export':native.exportBackup(JSON.stringify({format:'youji-backup',version:1,achievementLanguage:achievementLanguage(),exportedAt:new Date().toISOString(),games:backupGames()},null,2));break;
     case 'restore':native.pickImport();break;
     case 'check-update':toast('正在检查更新');native.checkForUpdates(true);break;
     case 'update-later':closeConfirm();break;
@@ -410,9 +441,10 @@ document.addEventListener('click',e=>{
     case 'confirm-now':if(confirmAction.callback)confirmAction.callback();break;
   }
 });
-document.addEventListener('error',e=>{if(e.target?.classList?.contains('game-cover'))e.target.hidden=true;},true);
+document.addEventListener('error',e=>{if(e.target?.classList?.contains('game-cover')||e.target?.matches?.('[data-achievement-game]'))e.target.hidden=true;},true);
 document.addEventListener('change',e=>{
   if(e.target.id==='duplicate-mode')duplicateMode=e.target.value;
+  if(e.target.id==='achievement-language'){data.achievementLanguage=e.target.value==='en'?'en':'zh';persist();toast(data.achievementLanguage==='en'?'English':'中文');}
   if(e.target.matches('[data-achievement-index]')){
     const g=data.games.find(x=>x.id===detailId),item=g?.achievementItems?.[Number(e.target.dataset.achievementIndex)];
     if(item){item.unlocked=e.target.checked;persist();render();}

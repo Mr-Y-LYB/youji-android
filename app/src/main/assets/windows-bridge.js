@@ -26,6 +26,18 @@ if(location.protocol==='http:' && location.hostname==='127.0.0.1'){
     loadState:()=>call('state').state||'{"version":1,"games":[]}',
     saveState:state=>!!call('state',{state}).ok,
     ensureCovers:games=>{fetchJson('covers',{games:JSON.parse(games)},()=>{});},
+    ensureAchievementIcons:game=>{fetchJson('achievement-icons',{game:JSON.parse(game)},()=>{});},
+    pickAchievementIcon:(id,key)=>filePicker('image/*',file=>{
+      if(file.size>12*1024*1024){window.onAchievementIconError('图片不能超过 12 MB');return;}
+      const reader=new FileReader();reader.onload=()=>{
+        const image=new Image();image.onload=()=>{
+          const canvas=document.createElement('canvas');canvas.width=80;canvas.height=80;
+          const ctx=canvas.getContext('2d'),side=Math.min(image.width,image.height);
+          ctx.drawImage(image,(image.width-side)/2,(image.height-side)/2,side,side,0,0,80,80);
+          window.onManualAchievementIconReady({id,key,data:canvas.toDataURL('image/jpeg',.85)});
+        };image.onerror=()=>window.onAchievementIconError('图标读取失败');image.src=reader.result;
+      };reader.readAsDataURL(file);
+    }),
     getManualCoverData:id=>call('manual-cover?id='+encodeURIComponent(id)).data||'',
     saveManualCover:(id,data)=>!!call('manual-cover',{id,data}).ok,
     clearAutoCover:id=>call('cover-clear',{id,kind:'auto'}),
@@ -63,7 +75,7 @@ if(location.protocol==='http:' && location.hostname==='127.0.0.1'){
   };
   setInterval(()=>{
     const events=call('cover-events').events||[];
-    for(const item of events)window.onCoverReady?.(item);
+    for(const item of events){if(item.kind==='achievement-icon')window.onAchievementIconReady?.(item);else window.onCoverReady?.(item);}
   },1200);
   window.addEventListener('load',()=>setTimeout(()=>window.Native.checkForUpdates(false),1000));
 }

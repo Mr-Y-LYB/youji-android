@@ -38,7 +38,7 @@ assert.match(vm.runInContext('renderHome()', context), /class="game-cover"/);
 assert.doesNotMatch(vm.runInContext('renderHome()', context), /把玩过的游戏|YOUR PLAY HISTORY/);
 assert.equal(vm.runInContext('data.games.length', context), 1);
 vm.runInContext("navigate('home')", context);
-assert.deepEqual(seen, ['1.3.2']);
+assert.deepEqual(seen, ['1.3.3']);
 assert.equal(vm.runInContext('tab', context), 'home');
 assert.match(elements.screen.innerHTML, /泰拉瑞亚/);
 vm.runInContext("navigate('settings'); navigate('updates')", context);

@@ -1,24 +1,24 @@
 {
-  "tag_name": "v1.3.2",
-  "body": "Steam 游戏按各自平台资料读取完整成就清单，可在详情中逐项标记；批量导入的游戏依次读取。其他平台可手动添加成就，旧版数字保留为历史统计。",
+  "tag_name": "v1.3.3",
+  "body": "Steam 成就显示官方图标，并可切换中文和英文；自建成就可选择本地图片。",
   "assets": [
     {
-      "name": "YouJi-v1.3.2.apk",
-      "browser_download_url": "https://github.com/Mr-Y-LYB/youji-android/releases/download/v1.3.2/YouJi-v1.3.2.apk",
-      "digest": "sha256:b9de756fee9e2bd494f021061051fa803772232055fd037db58a89f1bd3061e5",
-      "size": 47088329
+      "name": "YouJi-v1.3.3.apk",
+      "browser_download_url": "https://github.com/Mr-Y-LYB/youji-android/releases/download/v1.3.3/YouJi-v1.3.3.apk",
+      "digest": "sha256:72eb14d881e7967d974109c8b8c16f067c6f1c64f13c252a09527022493262c6",
+      "size": 47079226
     },
     {
-      "name": "YouJi-Windows-v1.3.2.zip",
-      "browser_download_url": "https://github.com/Mr-Y-LYB/youji-android/releases/download/v1.3.2/YouJi-Windows-v1.3.2.zip",
-      "digest": "sha256:b78d7ad4a1a1a9dd6e898c52f9009363149afbbb1a32ed59cb2f8cc2b0723117",
-      "size": 15654355
+      "name": "YouJi-Windows-v1.3.3.zip",
+      "browser_download_url": "https://github.com/Mr-Y-LYB/youji-android/releases/download/v1.3.3/YouJi-Windows-v1.3.3.zip",
+      "digest": "sha256:dd531df543bb196a4a85df53afcc20539feb2db9906e7ea64c644583092b6071",
+      "size": 15657749
     },
     {
-      "name": "YouJi-Windows-v1.3.2.exe",
-      "browser_download_url": "https://github.com/Mr-Y-LYB/youji-android/releases/download/v1.3.2/YouJi-Windows-v1.3.2.exe",
-      "digest": "sha256:30284397f90b793d09f500a73b0f85d2b1a50ce62fe6aba40cb8a0ad3d1769fa",
-      "size": 15838487
+      "name": "YouJi-Windows-v1.3.3.exe",
+      "browser_download_url": "https://github.com/Mr-Y-LYB/youji-android/releases/download/v1.3.3/YouJi-Windows-v1.3.3.exe",
+      "digest": "sha256:3ace19d2d90bc56bb4179adff114060cc94ab12d2f157898555ea6e6a97c2d38",
+      "size": 15842392
     }
   ]
 }
