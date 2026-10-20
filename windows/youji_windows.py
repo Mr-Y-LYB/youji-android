@@ -25,7 +25,7 @@ from xml.etree import ElementTree as ET
 from PIL import Image, ImageOps
 
 
-VERSION = "1.3.0"
+VERSION = "1.3.1"
 DATA_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "YouJi"
 ASSETS = ((Path(sys._MEIPASS) / "assets") if hasattr(sys, "_MEIPASS")
           else Path(__file__).resolve().parents[1] / "app/src/main/assets")
@@ -347,7 +347,21 @@ class Handler(BaseHTTPRequestHandler):
                     title_en = result.get(str(steam_id), {}).get("data", {}).get("name", "")
                 self.send_json({"requestId": request.get("requestId"), "title": request.get("title", ""), "titleEn": title_en})
             elif path == "/api/update":
-                release = steam_json("https://api.github.com/repos/Mr-Y-LYB/youji-android/releases/latest")
+                release = None
+                for url in (
+                    "https://api.github.com/repos/Mr-Y-LYB/youji-android/releases/latest",
+                    "https://raw.githubusercontent.com/Mr-Y-LYB/youji-android/main/update.json",
+                    "https://cdn.jsdelivr.net/gh/Mr-Y-LYB/youji-android@main/update.json",
+                ):
+                    try:
+                        candidate = steam_json(url)
+                        if candidate.get("tag_name") and isinstance(candidate.get("assets"), list):
+                            release = candidate
+                            break
+                    except Exception:
+                        continue
+                if release is None:
+                    raise ValueError("更新服务暂不可用")
                 latest = str(release.get("tag_name", "")).lstrip("v")
                 available = latest and tuple(map(int, latest.split("."))) > tuple(map(int, VERSION.split(".")))
                 asset = next((item for item in release.get("assets", []) if item.get("name", "").lower().endswith(".zip") and "windows" in item.get("name", "").lower()), None)

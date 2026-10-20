@@ -15,6 +15,7 @@ import org.json.JSONObject;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.ByteArrayOutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.security.MessageDigest;
@@ -25,12 +26,15 @@ import java.util.function.BiConsumer;
 final class UpdateManager {
     private static final String REPO = "Mr-Y-LYB/youji-android";
     private static final String API = "https://api.github.com/repos/" + REPO + "/releases/latest";
+    private static final String RAW_FEED = "https://raw.githubusercontent.com/" + REPO + "/main/update.json";
+    private static final String CDN_FEED = "https://cdn.jsdelivr.net/gh/" + REPO + "@main/update.json";
     private static final String ASSET_PREFIX = "https://github.com/" + REPO + "/releases/download/";
     private static final long MAX_APK_BYTES = 200L * 1024 * 1024;
     private final MainActivity activity;
     private final ExecutorService worker;
     private final BiConsumer<String, String> callback;
     private boolean checking;
+    private boolean manualRequested;
     private boolean downloading;
     private File pendingInstall;
 
@@ -41,12 +45,16 @@ final class UpdateManager {
     }
 
     synchronized void check(boolean manual) {
-        if (checking) return;
+        if (checking) {
+            if (manual) manualRequested = true;
+            return;
+        }
         checking = true;
+        manualRequested = manual;
         worker.execute(() -> {
             JSONObject response = new JSONObject();
             try {
-                JSONObject release = new JSONObject(readJson(API));
+                JSONObject release = loadRelease();
                 String version = release.optString("tag_name", "").replaceFirst("^[vV]", "");
                 if (!version.matches("\\d+\\.\\d+\\.\\d+") || compareVersion(version, currentVersion()) <= 0) {
                     response.put("available", false);
@@ -79,10 +87,14 @@ final class UpdateManager {
                 response = new JSONObject();
                 try { response.put("error", e.getMessage() == null ? "检查更新失败" : e.getMessage()); }
                 catch (Exception ignored) {}
-            } finally {
-                synchronized (this) { checking = false; }
             }
-            try { response.put("manual", manual); } catch (Exception ignored) {}
+            boolean showManual;
+            synchronized (this) {
+                showManual = manualRequested;
+                manualRequested = false;
+                checking = false;
+            }
+            try { response.put("manual", showManual); } catch (Exception ignored) {}
             callback.accept("onUpdateCheck", response.toString());
         });
     }
@@ -203,22 +215,53 @@ final class UpdateManager {
         callback.accept("onUpdateDownload", obj.toString());
     }
 
+    private JSONObject loadRelease() throws Exception {
+        String firstError = "";
+        String[] feeds = {API, RAW_FEED, CDN_FEED + "?t=" + (System.currentTimeMillis() / 3600000)};
+        for (String feed : feeds) {
+            for (int attempt = 0; attempt < (feed.equals(API) ? 2 : 1); attempt++) {
+                try {
+                    JSONObject release = new JSONObject(readJson(feed));
+                    if (!release.has("tag_name") || release.optJSONArray("assets") == null)
+                        throw new IllegalStateException("版本信息格式无效");
+                    return release;
+                } catch (Exception e) {
+                    if (firstError.isEmpty()) firstError = e.getMessage() == null ? "连接失败" : e.getMessage();
+                    if (attempt == 0 && feed.equals(API))
+                        try { Thread.sleep(500); } catch (InterruptedException interrupted) {
+                            Thread.currentThread().interrupt();
+                            throw interrupted;
+                        }
+                }
+            }
+        }
+        throw new IllegalStateException("更新服务暂不可用（" + firstError + "）");
+    }
+
     private String readJson(String url) throws Exception {
         HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
         conn.setConnectTimeout(7000);
         conn.setReadTimeout(7000);
         conn.setRequestProperty("User-Agent", "YouJi/" + currentVersion());
-        conn.setRequestProperty("Accept", "application/vnd.github+json");
+        conn.setRequestProperty("Accept", url.startsWith(API) ? "application/vnd.github+json" : "application/json");
+        conn.setRequestProperty("Cache-Control", "no-cache");
         try {
-            if (conn.getResponseCode() != 200) throw new IllegalStateException("更新源暂不可用");
-            try (InputStream in = conn.getInputStream()) {
-                byte[] bytes = new byte[1024 * 1024];
-                int used = 0, count;
-                while ((count = in.read(bytes, used, bytes.length - used)) != -1) {
-                    used += count;
-                    if (used == bytes.length) throw new IllegalStateException("更新信息过大");
+            int code = conn.getResponseCode();
+            if (code != 200) {
+                String limited = "0".equals(conn.getHeaderField("X-RateLimit-Remaining"))
+                    ? "（请求次数受限）" : "";
+                throw new IllegalStateException("HTTP " + code + limited);
+            }
+            if (!"https".equals(conn.getURL().getProtocol()))
+                throw new IllegalStateException("更新地址不安全");
+            try (InputStream in = conn.getInputStream(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+                byte[] bytes = new byte[8192];
+                int count;
+                while ((count = in.read(bytes)) != -1) {
+                    if (out.size() + count > 1024 * 1024) throw new IllegalStateException("更新信息过大");
+                    out.write(bytes, 0, count);
                 }
-                return new String(bytes, 0, used, java.nio.charset.StandardCharsets.UTF_8);
+                return out.toString(java.nio.charset.StandardCharsets.UTF_8.name());
             }
         } finally { conn.disconnect(); }
     }

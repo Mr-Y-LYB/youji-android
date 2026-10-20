@@ -23,8 +23,9 @@ const native = typeof Native !== 'undefined' ? Native : {
 let data;
 try { data=JSON.parse(native.loadState()); if (!Array.isArray(data.games)) throw Error('bad state'); }
 catch(e) { data={version:1,games:[]}; }
-const APP_VERSION='1.3.0';
+const APP_VERSION='1.3.1';
 const CHANGELOG=[
+  {version:'1.3.1',date:'2026-10-20',changes:['更新检查失败时会重试并使用备用版本信息。','手动检查更新会显示实际连接结果。']},
   {version:'1.3.0',date:'2026-10-20',changes:['游戏列表自动显示匹配到的 Steam 官方预览图，图片下载后保存在手机本地。','可为未匹配到的游戏手动选取封面。','统一设置页图标尺寸。']},
   {version:'1.2.0',date:'2026-10-20',changes:['打开应用时检查 GitHub Releases，新版本可在应用内下载。','下载后校验版本与签名，再由 Android 安装。','设置中可手动检查更新。']},
   {version:'1.1.0',date:'2026-10-20',changes:['新增更新说明，升级后首次打开会显示，也可在设置中查看。','精简概览、导入和设置页面。','将编辑游戏的可选数据收起，减少页面长度。']},
@@ -32,7 +33,7 @@ const CHANGELOG=[
 ];
 function seenVersion(){try{return native.getSeenVersion()||'';}catch(e){return '';}}
 function markVersionSeen(){try{native.markVersionSeen(APP_VERSION);}catch(e){}}
-let tab=seenVersion()===APP_VERSION?'home':'updates', updatesReturn='home', editId=null, importMode='screenshot', importCandidates=[], importPage=0, duplicateMode='merge', importTable=null, mapping={}, importSource='', onlineResults=[], onlineStatus='', onlineSeq=0, onlineTimer=null, selectedSearchSeq=0, selectedSteamId=0, libQuery='', libFilter='all', libSort='recent', availableUpdate=null, dismissedUpdate='';
+let tab=seenVersion()===APP_VERSION?'home':'updates', updatesReturn='home', editId=null, importMode='screenshot', importCandidates=[], importPage=0, duplicateMode='merge', importTable=null, mapping={}, importSource='', onlineResults=[], onlineStatus='', onlineSeq=0, onlineTimer=null, selectedSearchSeq=0, selectedSteamId=0, libQuery='', libFilter='all', libSort='recent', availableUpdate=null;
 const coverEpoch={};
 const platforms=['Steam','Epic','Xbox / PC Game Pass','GOG','Ubisoft Connect','EA app','Battle.net','WeGame','其他'];
 const statuses=['想玩','在玩','已通关','已搁置','弃坑'];
@@ -271,7 +272,6 @@ window.onUpdateCheck=info=>{
   if(info.error){if(info.manual)toast(info.error);return;}
   if(!info.available){if(info.manual)toast('已是最新版本');return;}
   availableUpdate=info;
-  if(info.version===dismissedUpdate&&!info.manual)return;
   const layer=$('confirm-layer');
   layer.innerHTML=`<div class="confirm-box"><h3>发现新版本 v${esc(info.version)}</h3><p class="update-notes">${esc(info.notes||'有新版本可用')}</p><div class="buttons"><button class="btn btn-outline" data-action="update-later">稍后</button><button class="btn btn-primary" data-action="update-now">下载更新</button></div></div>`;
   layer.classList.remove('hidden');
@@ -327,7 +327,7 @@ document.addEventListener('click',e=>{
     case 'export':native.exportBackup(JSON.stringify({format:'youji-backup',version:1,exportedAt:new Date().toISOString(),games:backupGames()},null,2));break;
     case 'restore':native.pickImport();break;
     case 'check-update':toast('正在检查更新');native.checkForUpdates(true);break;
-    case 'update-later':dismissedUpdate=availableUpdate?.version||'';closeConfirm();break;
+    case 'update-later':closeConfirm();break;
     case 'update-now':if(availableUpdate){const item=availableUpdate;closeConfirm();toast('开始下载更新');native.downloadUpdate(item.url,item.digest,item.version);}break;
     case 'cancel-confirm':closeConfirm();break;
     case 'confirm-now':if(confirmAction.callback)confirmAction.callback();break;

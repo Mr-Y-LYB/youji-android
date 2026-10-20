@@ -4,9 +4,9 @@
 
 ## 安装
 
-将 `dist/游迹-v1.3.0.apk` 传到 Android 手机，打开文件安装。已安装旧版的手机可直接覆盖更新，原有记录会保留。首次安装时，手机可能要求允许当前文件管理器安装应用。支持 Android 8.0 及以上。
+将 `dist/游迹-v1.3.1.apk` 传到 Android 手机，打开文件安装。已安装旧版的手机可直接覆盖更新，原有记录会保留。首次安装时，手机可能要求允许当前文件管理器安装应用。支持 Android 8.0 及以上。
 
-Windows：从 v1.3.0 的 GitHub Release 下载 `YouJi-Windows-v1.3.0.zip`，完整解压后双击 `Install.cmd`。安装后从开始菜单打开「游迹」。也可下载 `YouJi-Windows-v1.3.0.exe` 直接运行。无需安装 Python，需要 Microsoft Edge。Windows 数据保存在 `%LOCALAPPDATA%\YouJi`，可用 JSON 备份与 Android 版迁移。Windows 版支持手动添加、Steam 名称和封面、手动选图、文字及文件导入；截图直接识别目前仅在 Android 版提供。
+Windows：从 v1.3.1 的 GitHub Release 下载 `YouJi-Windows-v1.3.1.zip`，完整解压后双击 `Install.cmd`。安装后从开始菜单打开「游迹」。也可下载 `YouJi-Windows-v1.3.1.exe` 直接运行。无需安装 Python，需要 Microsoft Edge。Windows 数据保存在 `%LOCALAPPDATA%\YouJi`，可用 JSON 备份与 Android 版迁移。Windows 版支持手动添加、Steam 名称和封面、手动选图、文字及文件导入；截图直接识别目前仅在 Android 版提供。
 
 ## 使用
 
@@ -21,7 +21,7 @@ Windows：从 v1.3.0 的 GitHub Release 下载 `YouJi-Windows-v1.3.0.zip`，完�
 
 用 Android Studio 打开本目录，安装 Android SDK 35，选择 **Build > Build APK(s)**。也可以在 PowerShell 中运行 `./build.ps1`，脚本会优先使用项目内已有的构建工具，并将 APK 复制到 `dist`。其他电脑上可运行 `gradlew.bat assembleDebug`。项目使用 JDK 17、Gradle 8.13、Android Gradle Plugin 8.13.0。
 
-Windows 版使用 Python 3.13 和 PyInstaller。在 Windows 上运行 `python -m pip install pyinstaller pillow`，然后运行 `./build-windows.ps1`，可生成 `dist/YouJi-Windows-v1.3.0.zip`。
+Windows 版使用 Python 3.13 和 PyInstaller。在 Windows 上运行 `python -m pip install pyinstaller pillow`，然后运行 `./build-windows.ps1`，可生成 `dist/YouJi-Windows-v1.3.1.zip`。
 
 ## 数据和识别说明
 
@@ -31,4 +31,4 @@ Windows 版使用 Python 3.13 和 PyInstaller。在 Windows 上运行 `python -m
 
 ## 发布更新
 
-应用检查公开仓库 `Mr-Y-LYB/youji-android` 的最新 GitHub Release。当前版本为 v1.3.0。后续版本须上传与 Release 标签版本一致的 APK（例如标签 `v1.3.0` 对应 `YouJi-v1.3.0.apk`）。GitHub API 必须为 APK 提供 SHA-256 digest。所有后续 APK 必须使用原签名，且 Android `versionCode` 必须递增。发布更高版本后，已安装的应用会在打开时发现并提示下载。
+应用打开时先检查 GitHub Release；接口不可用时会尝试仓库中的 `update.json` 静态版本信息及其 CDN 镜像。当前版本为 v1.3.1。后续版本须上传与 Release 标签版本一致的 APK，并同步更新 `update.json` 中的 SHA-256 digest。所有后续 APK 必须使用原签名，且 Android `versionCode` 必须递增。

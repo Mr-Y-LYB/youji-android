@@ -29,7 +29,7 @@ vm.runInContext(app.slice(0, app.indexOf("document.addEventListener('click'")), 
 
 assert.equal(vm.runInContext('tab', context), 'updates');
 assert.match(vm.runInContext('renderUpdates()', context), /更新说明/);
-assert.match(vm.runInContext('renderUpdates()', context), /v1\.3\.0/);
+assert.match(vm.runInContext('renderUpdates()', context), /v1\.3\.1/);
 assert.match(vm.runInContext('renderSettings()', context), /data-to="updates"/);
 assert.match(vm.runInContext('renderSettings()', context), /data-action="check-update"/);
 assert.equal((vm.runInContext('renderSettings()', context).match(/<svg /g) || []).length, 4);
@@ -38,7 +38,7 @@ assert.match(vm.runInContext('renderHome()', context), /class="game-cover"/);
 assert.doesNotMatch(vm.runInContext('renderHome()', context), /把玩过的游戏|YOUR PLAY HISTORY/);
 assert.equal(vm.runInContext('data.games.length', context), 1);
 vm.runInContext("navigate('home')", context);
-assert.deepEqual(seen, ['1.3.0']);
+assert.deepEqual(seen, ['1.3.1']);
 assert.equal(vm.runInContext('tab', context), 'home');
 assert.match(elements.screen.innerHTML, /泰拉瑞亚/);
 vm.runInContext("navigate('settings'); navigate('updates')", context);

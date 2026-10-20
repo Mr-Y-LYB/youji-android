@@ -1,7 +1,7 @@
-游迹 Windows v1.3.0
+游迹 Windows v1.3.1
 
 安装：解压整个 ZIP，双击「Install.cmd」。安装后从 Windows 开始菜单打开「游迹」。
-如只需直接运行，也可从 Release 单独下载 YouJi-Windows-v1.3.0.exe。
+如只需直接运行，也可从 Release 单独下载 YouJi-Windows-v1.3.1.exe。
 无需管理员权限。运行需要 Microsoft Edge；Windows 10/11 通常已安装。
 
 数据保存在 %LOCALAPPDATA%\YouJi\games.json，封面在同目录的 covers 文件夹。

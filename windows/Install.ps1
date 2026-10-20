@@ -3,7 +3,7 @@ $source = Join-Path $PSScriptRoot 'YouJi.exe'
 if (-not (Test-Path -LiteralPath $source)) { throw '安装包内缺少 YouJi.exe' }
 $installDir = Join-Path $env:LOCALAPPDATA 'Programs\YouJi'
 New-Item -ItemType Directory -Force -Path $installDir | Out-Null
-$target = Join-Path $installDir 'YouJi-v1.3.0.exe'
+$target = Join-Path $installDir 'YouJi-v1.3.1.exe'
 Copy-Item -LiteralPath $source -Destination $target -Force
 $startMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
 New-Item -ItemType Directory -Force -Path $startMenu | Out-Null
