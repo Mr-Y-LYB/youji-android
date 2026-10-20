@@ -160,7 +160,7 @@ def queue_covers(games: list[dict]) -> None:
                 or image_file(game_id, "manual").exists()
                 or image_file(game_id, "auto").exists()):
             continue
-        if time.time() - misses.get(game_id + ":" + norm(title), 0) < 7 * 24 * 3600:
+        if not game.get("force") and time.time() - misses.get(game_id + ":" + norm(title), 0) < 7 * 24 * 3600:
             continue
         with lock:
             if game_id in inflight:

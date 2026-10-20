@@ -48,7 +48,7 @@ function initials(g){return /[\u3400-\u9fff]/.test(g.title)?g.title.slice(0,2):(
 function platformClass(s){return /^Steam$/i.test(s)?'steam':/^Epic$/i.test(s)?'epic':/Xbox/.test(s)?'xbox':'other';}
 function coverUrl(id){const base=window.__YOUJI_WINDOWS__?'':'https://appassets.androidplatform.net';return base+'/youji-covers/'+encodeURIComponent(id)+'.jpg?v='+(coverEpoch[id]||1);}
 function coverArt(g,i){return `<span class="game-art ${artClass(i)}"><span class="game-initials">${esc(initials(g))}</span><img class="game-cover" data-cover-id="${esc(g.id)}" src="${esc(coverUrl(g.id))}" alt=""></span>`;}
-function ensureCovers(games=data.games){for(let i=0;i<games.length;i+=100)native.ensureCovers(JSON.stringify(games.slice(i,i+100).map(g=>({id:g.id,title:g.title,titleEn:g.titleEn||'',steamId:g.steamId||0}))));}
+function ensureCovers(games=data.games,force=false){for(let i=0;i<games.length;i+=100)native.ensureCovers(JSON.stringify(games.slice(i,i+100).map(g=>({id:g.id,title:g.title,titleEn:g.titleEn||'',steamId:g.steamId||0,force}))));}
 function refreshCover(id){coverEpoch[id]=Date.now();document.querySelectorAll('.game-cover').forEach(img=>{if(img.dataset.coverId===id){img.hidden=false;img.src=coverUrl(id);}});}
 function backupGames(){return data.games.map(g=>{const record={...g};if(g.coverKind==='manual'){const image=native.getManualCoverData(g.id);if(image)record.manualCoverData=image;}return record;});}
 function optionList(values,selected){const all=values.includes(selected)?values:[...values,selected];return all.map(v=>`<option value="${esc(v)}" ${v===selected?'selected':''}>${esc(v)}</option>`).join('');}
@@ -309,7 +309,7 @@ document.addEventListener('click',e=>{
     case 'auto-cover':{
       const game=data.games.find(g=>g.id===b.dataset.id);if(!game)break;
       native.clearManualCover(game.id);native.clearAutoCover(game.id);
-      delete game.coverKind;persist();refreshCover(game.id);ensureCovers([game]);toast('正在匹配封面');
+      delete game.coverKind;persist();refreshCover(game.id);ensureCovers([game],true);toast('正在匹配封面');
       break;
     }
     case 'import-mode':importMode=b.dataset.mode;render();break;

@@ -56,11 +56,12 @@ final class CoverManager {
                 String title = item.optString("title", "");
                 String titleEn = item.optString("titleEn", "");
                 int steamId = item.optInt("steamId", 0);
+                boolean force = item.optBoolean("force", false);
                 if (!validId(id) || title.isEmpty() || title.length() > 160 || titleEn.length() > 160
                     || manualFile(id).isFile() || autoFile(id).isFile()) continue;
                 String missKey = hash(id + "\n" + normalize(title) + "\n" + normalize(titleEn));
                 long lastMiss = activity.getPreferences(0).getLong("cover_miss_" + missKey, 0);
-                if (System.currentTimeMillis() - lastMiss < NEGATIVE_TTL) continue;
+                if (!force && System.currentTimeMillis() - lastMiss < NEGATIVE_TTL) continue;
                 if (!inFlight.add(id)) continue;
                 workers.execute(() -> {
                     try {
