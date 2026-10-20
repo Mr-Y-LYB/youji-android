@@ -6,7 +6,7 @@
 
 将 `dist/游迹-v1.3.0.apk` 传到 Android 手机，打开文件安装。已安装旧版的手机可直接覆盖更新，原有记录会保留。首次安装时，手机可能要求允许当前文件管理器安装应用。支持 Android 8.0 及以上。
 
-Windows：从 v1.3.0 的 GitHub Release 下载 `YouJi-Windows-v1.3.0.zip`，完整解压后双击 `Install.cmd`。安装后从开始菜单打开「游迹」。无需安装 Python，需要 Microsoft Edge。Windows 数据保存在 `%LOCALAPPDATA%\YouJi`，可用 JSON 备份与 Android 版迁移。Windows 版支持手动添加、Steam 名称和封面、手动选图、文字及文件导入；截图直接识别目前仅在 Android 版提供。
+Windows：从 v1.3.0 的 GitHub Release 下载 `YouJi-Windows-v1.3.0.zip`，完整解压后双击 `Install.cmd`。安装后从开始菜单打开「游迹」。也可下载 `YouJi-Windows-v1.3.0.exe` 直接运行。无需安装 Python，需要 Microsoft Edge。Windows 数据保存在 `%LOCALAPPDATA%\YouJi`，可用 JSON 备份与 Android 版迁移。Windows 版支持手动添加、Steam 名称和封面、手动选图、文字及文件导入；截图直接识别目前仅在 Android 版提供。
 
 ## 使用
 
