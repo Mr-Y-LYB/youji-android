@@ -75,3 +75,32 @@
 .cover-picker-actions{display:flex;gap:6px}
 .cover-picker-actions .btn{padding:6px 9px;font-size:10px;min-height:30px}
 @media(max-width:360px){.game-art{width:76px;height:50px;flex-basis:76px}.game-meta{gap:4px}.meta-text{font-size:9px}}
+.detail-head{display:flex;gap:13px;align-items:center;margin:2px 0 13px;min-width:0}
+.detail-head .game-art{width:110px;height:70px;flex-basis:110px}
+.detail-head>div{min-width:0}
+.detail-head h1{font-size:20px;line-height:1.3;margin:0 0 4px;overflow-wrap:anywhere}
+.detail-head p{font-size:11px;color:var(--muted);margin:0 0 8px;overflow-wrap:anywhere}
+.detail-facts{display:flex;flex-wrap:wrap;gap:8px;color:var(--muted);font-size:11px;margin-bottom:22px}
+.detail-facts span{padding:5px 8px;background:var(--panel);border:1px solid var(--border);border-radius:7px}
+.detail-section{margin-bottom:10px}
+.detail-section h2{font-size:17px}
+.achievement-progress{height:7px;border-radius:9px;background:#344156;overflow:hidden;margin-bottom:11px}
+.achievement-progress span{display:block;height:100%;background:var(--cyan);border-radius:9px;transition:width .2s}
+.history-count{color:var(--soft);font-size:11px;line-height:1.5;margin:0 0 10px}
+.achievement-tools{display:flex;justify-content:flex-end;margin:8px 0 12px}
+.achievement-tools .btn{min-height:34px;padding:7px 10px;font-size:11px}
+.achievement-error{color:var(--amber);font-size:11px;line-height:1.5;margin:8px 0 12px}
+.achievement-list{display:flex;flex-direction:column;gap:7px;margin:10px 0 16px}
+.achievement-row{display:flex;align-items:center;gap:5px;background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:11px 10px}
+.achievement-row label{display:flex;align-items:flex-start;gap:11px;flex:1;min-width:0;cursor:pointer}
+.achievement-row input{width:18px;height:18px;accent-color:var(--cyan);flex:0 0 18px;margin:1px 0 0}
+.achievement-row span{min-width:0}
+.achievement-row strong{display:block;font-size:12px;line-height:1.4;overflow-wrap:anywhere}
+.achievement-row small{display:block;color:var(--muted);font-size:10px;line-height:1.5;margin-top:3px;overflow-wrap:anywhere}
+.achievement-row button{border:0;background:none;color:var(--red);font-size:21px;padding:0 4px}
+.achievement-add{margin-top:12px}
+.achievement-add .btn{min-height:36px}
+.detail-notes{padding:13px;margin-top:12px}
+.detail-notes h2{font-size:13px;margin:0 0 7px}
+.detail-notes p{color:var(--muted);font-size:11px;line-height:1.6;margin:0;white-space:pre-wrap}
+@media(max-width:360px){.detail-head .game-art{width:88px;height:58px;flex-basis:88px}.detail-head h1{font-size:17px}}

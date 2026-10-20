@@ -52,6 +52,7 @@ if(location.protocol==='http:' && location.hostname==='127.0.0.1'){
     },
     searchOnline:(query,requestId)=>fetchJson('search',{query,requestId},r=>window.onOnlineResults({...r,requestId})),
     resolveEnglish:(steamId,title,requestId)=>fetchJson('english',{steamId,title,requestId},r=>window.onEnglishResolved({...r,requestId,title})),
+    fetchAchievements:gameJson=>{const game=JSON.parse(gameJson);fetchJson('achievements',{game},r=>window.onAchievementsLoaded({...r,id:game.id,platform:game.platform,title:game.title}));},
     checkForUpdates:manual=>fetchJson('update',{manual},r=>window.onUpdateCheck({...r,manual})),
     downloadUpdate:url=>{
       if(/^https:\/\/github\.com\/Mr-Y-LYB\/youji-android\/releases\/download\//.test(url)){

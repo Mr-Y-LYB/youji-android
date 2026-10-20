@@ -13,17 +13,17 @@ try {
         (Join-Path $root 'windows\youji_windows.py')
     if ($LASTEXITCODE -ne 0) { throw 'Windows 程序构建失败' }
     Copy-Item -LiteralPath (Join-Path $output 'YouJi.exe') `
-        -Destination (Join-Path $root 'dist\YouJi-Windows-v1.3.1.exe') -Force
-    $stage = Join-Path $root 'dist\windows-package-v1.3.1'
+        -Destination (Join-Path $root 'dist\YouJi-Windows-v1.3.2.exe') -Force
+    $stage = Join-Path $root 'dist\windows-package-v1.3.2'
     New-Item -ItemType Directory -Force -Path $stage | Out-Null
     Copy-Item -LiteralPath (Join-Path $output 'YouJi.exe') -Destination $stage -Force
     foreach ($name in @('Install.cmd','Install.ps1','README-Windows.txt')) {
         Copy-Item -LiteralPath (Join-Path $root ('windows\' + $name)) -Destination $stage -Force
     }
     Compress-Archive -Path (Join-Path $stage '*') `
-        -DestinationPath (Join-Path $root 'dist\YouJi-Windows-v1.3.1.zip') -Force
-    Write-Host 'Windows 安装包：dist\YouJi-Windows-v1.3.1.zip'
-    Write-Host 'Windows 便携版：dist\YouJi-Windows-v1.3.1.exe'
+        -DestinationPath (Join-Path $root 'dist\YouJi-Windows-v1.3.2.zip') -Force
+    Write-Host 'Windows 安装包：dist\YouJi-Windows-v1.3.2.zip'
+    Write-Host 'Windows 便携版：dist\YouJi-Windows-v1.3.2.exe'
 } finally {
     Pop-Location
 }

@@ -52,6 +52,7 @@ public class MainActivity extends Activity {
     private String pendingExport;
     private String pendingCoverId;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
+    private final ExecutorService achievementWorker = Executors.newFixedThreadPool(2);
     private UpdateManager updater;
     private CoverManager covers;
     private boolean pageReady;
@@ -255,6 +256,25 @@ public class MainActivity extends Activity {
                 callback("onEnglishResolved", result.toString());
             });
         }
+
+        @JavascriptInterface public void fetchAchievements(String gameJson) {
+            achievementWorker.execute(() -> {
+                JSONObject response = new JSONObject();
+                try {
+                    JSONObject game = new JSONObject(gameJson);
+                    response.put("id", game.optString("id", ""));
+                    response.put("platform", game.optString("platform", ""));
+                    response.put("title", game.optString("title", ""));
+                    JSONObject result = AchievementCatalog.fetch(game);
+                    response.put("steamId", result.getInt("steamId"));
+                    response.put("items", result.getJSONArray("items"));
+                } catch (Exception e) {
+                    try { response.put("error", e.getMessage() == null ? "成就读取失败" : e.getMessage()); }
+                    catch (Exception ignored) {}
+                }
+                callback("onAchievementsLoaded", response.toString());
+            });
+        }
     }
 
     private static String getHttps(String url) throws Exception {
@@ -424,6 +444,7 @@ public class MainActivity extends Activity {
 
     @Override protected void onDestroy() {
         worker.shutdownNow();
+        achievementWorker.shutdownNow();
         covers.shutdown();
         web.destroy();
         super.onDestroy();

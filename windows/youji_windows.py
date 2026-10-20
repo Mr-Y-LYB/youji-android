@@ -25,7 +25,7 @@ from xml.etree import ElementTree as ET
 from PIL import Image, ImageOps
 
 
-VERSION = "1.3.1"
+VERSION = "1.3.2"
 DATA_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "YouJi"
 ASSETS = ((Path(sys._MEIPASS) / "assets") if hasattr(sys, "_MEIPASS")
           else Path(__file__).resolve().parents[1] / "app/src/main/assets")
@@ -93,6 +93,56 @@ def steam_search(query: str, lang: str = "schinese") -> list[dict]:
     url = ("https://store.steampowered.com/api/storesearch/?term="
            + urllib.parse.quote(query) + "&l=" + lang + "&cc=CN")
     return steam_json(url).get("items", [])[:20]
+
+
+def steam_achievement_catalog(game: dict) -> dict:
+    if str(game.get("platform", "")).lower() != "steam":
+        raise ValueError("该平台暂无公开成就清单，请手动添加")
+    steam_id = int(game.get("steamId") or 0)
+    if steam_id <= 0:
+        for title, language in ((game.get("titleEn", ""), "english"),
+                                (game.get("title", ""), "schinese")):
+            if not title:
+                continue
+            try:
+                match = next((item for item in steam_search(str(title), language)
+                              if norm(item.get("name", "")) == norm(str(title))), None)
+                if match:
+                    steam_id = int(match["id"])
+                    break
+            except Exception:
+                continue
+    if steam_id <= 0:
+        raise ValueError("未找到对应的 Steam 游戏，请编辑名称后重试")
+    url = f"https://steamcommunity.com/stats/{steam_id}/achievements/?l=schinese"
+    request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; YouJi/1.3.2)",
+                                                  "Accept": "text/html"})
+    with urllib.request.urlopen(request, timeout=12) as response:
+        if response.status != 200:
+            raise ValueError("Steam 成就页面暂不可用")
+        html = response.read(2 * 1024 * 1024 + 1).decode("utf-8")
+    if len(html) > 2 * 1024 * 1024:
+        raise ValueError("成就清单过大")
+    match = re.search(r'<script[^>]*id="valve-ssr-data"[^>]*>(.*?)</script>', html, re.S)
+    if not match:
+        raise ValueError("Steam 成就页面格式已变化")
+    page = json.loads(match.group(1))
+    cache = json.loads(page["renderContext"]["queryData"])
+    schema = next((query.get("state", {}).get("data") for query in cache["queries"]
+                   if query.get("queryKey", [])[:3] == ["achievements", steam_id, "schema"]), None)
+    if schema is None:
+        raise ValueError("Steam 未提供成就清单")
+    items = []
+    for group in schema.get("groups", []):
+        if group.get("archived") or not group.get("ispublic", True):
+            continue
+        for achievement in group.get("achievements", []):
+            if achievement.get("archived") or not achievement.get("name"):
+                continue
+            items.append({"key": achievement.get("api_name") or str(achievement.get("internal_key", "")),
+                          "name": achievement["name"],
+                          "description": achievement.get("description", "")})
+    return {"steamId": steam_id, "items": items}
 
 
 def find_steam_cover(title: str, title_en: str, steam_id: int) -> tuple[int, str] | None:
@@ -346,6 +396,11 @@ class Handler(BaseHTTPRequestHandler):
                     result = steam_json(f"https://store.steampowered.com/api/appdetails?appids={steam_id}&l=english&cc=US")
                     title_en = result.get(str(steam_id), {}).get("data", {}).get("name", "")
                 self.send_json({"requestId": request.get("requestId"), "title": request.get("title", ""), "titleEn": title_en})
+            elif path == "/api/achievements":
+                game = request.get("game", {})
+                result = steam_achievement_catalog(game)
+                self.send_json({"id": game.get("id", ""), "platform": game.get("platform", ""),
+                                "title": game.get("title", ""), **result})
             elif path == "/api/update":
                 release = None
                 for url in (
